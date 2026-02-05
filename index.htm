@@ -3511,15 +3511,7 @@ input, select, textarea {
     </div>
   </div>
 </div>
-<div class="filter-container" style="margin: 10px; text-align: center;">
-    <label for="offerSelect" style="font-weight: bold; color: var(--primary-color);">اختر العرض الحالي:</label>
-    <select id="offerSelect" class="search-input" style="width: auto; padding: 5px 15px;">
-        <option value="8to14feboffers.json">عروض 8 - 14 فبراير</option>
-        <option value="15to24feboffers.json">عروض 15 - 24 فبراير</option>
-        <option value="25febto5marsoffers.json">عروض 25 فبراير - 5 مارس</option>
-        <option value="exclusiveoffersdb.json">العروض الحصرية</option>
-    </select>
-</div>
+
 <!-- زرار Custom Offer Print الموجود -->
 <button onclick="printExclusiveOffers()" style="display: inline-block; padding: 15px 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); transition: all 0.3s ease; margin: 10px;" onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 25px rgba(102, 126, 234, 0.6)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 6px 20px rgba(102, 126, 234, 0.4)';">
   🌟 Exclusive Offers(5,10,15 SAR) Print
@@ -3799,7 +3791,18 @@ input, select, textarea {
     }
 }
 </style>
-
+<div class="filter-group" style="background: #e0f2fe; border: 2px solid #3b82f6; padding: 10px; border-radius: 8px; margin-bottom: 20px;">
+  <label style="color: #1e40af; font-weight: 800; font-size: 14px; display:flex; align-items:center; gap:5px;">
+    📂 ملف العروض النشط
+  </label>
+  
+  <select id="offerSourceSelect" onchange="changeOfferFile(this.value)" class="global-search-box" style="width:100%; font-weight:bold; color:#000; cursor:pointer; padding: 10px; border-radius: 5px;">
+    <option value="8to14feboffers.json">📅 عروض 8-14 فبراير</option>
+    <option value="15to24feboffers.json">📅 عروض 15-24 فبراير</option>
+    <option value="25febto5marsoffers.json">📅 عروض 25 فبراير - 5 مارس</option>
+    <option value="exclusiveoffersdb.json">⭐ العروض الحصرية</option>
+  </select>
+</div>
 <!-- Offer Boxes -->
 <div class="offer-boxes-container"></div>
 <div class="pro-tip-card">
@@ -4184,52 +4187,6 @@ infoBox.addEventListener('click', toggleInfoBox);
 <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
 <script src="https://unpkg.com/html2canvas@latest/dist/html2canvas.min.js"></script>
 <script>   
-
-
-let productsDB = [];
-let offersDB = [];
-
-// 1. تحميل المنتجات (مرة واحدة عند فتح الصفحة)
-async function initAppData() {
-    try {
-        const prodRes = await fetch('productsdb.json');
-        productsDB = await prodRes.json();
-        
-        // تحميل أول ملف عروض تلقائياً
-        loadOffersData('8to14feboffers.json');
-    } catch (err) {
-        console.error("خطأ في تحميل البيانات الأساسية:", err);
-    }
-}
-
-// 2. تحميل ملف عروض محدد
-async function loadOffersData(fileName) {
-    try {
-        const offRes = await fetch(fileName);
-        const data = await offRes.json();
-        
-        offersDB = data.offers; // تحديث مصفوفة العروض
-        
-        // تحديث تواريخ العداد التنازلي من الملف
-        if(data.offerConfig) {
-            updateTimerDates(data.offerConfig.startDate, data.offerConfig.endDate);
-        }
-
-        renderProducts(); // إعادة عرض المنتجات بالعروض الجديدة
-        console.log(`تم تحميل ملف: ${fileName}`);
-    } catch (err) {
-        console.warn("الملف غير موجود أو به خطأ:", fileName);
-    }
-}
-
-// ربط القائمة المنسدلة بالتحميل
-document.getElementById('offerSelect').addEventListener('change', (e) => {
-    loadOffersData(e.target.value);
-});
-
-// تشغيل التطبيق
-initAppData();
-
 // ====== iOS AUTO OPTIMIZER ======
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 
@@ -4320,7 +4277,86 @@ const categoryImagesDB = {
     "SPORTS & FITTNESS":      { icon: "img", hero: "img" },
     "TOPICAL PREPARATION":    { icon: "img", hero: "img" }
 };
+// 1. تعريف المتغيرات (لتستقبل البيانات الخارجية)
+let productsDB = [];
+let offersDB = [];
+// تواريخ افتراضية (هتتغير اول ما الملف يحمل)
+let CURRENT_OFFER_START = new Date();
+let CURRENT_OFFER_END = new Date();
+let NEXT_OFFER_START = new Date();
+let NEXT_OFFER_END = new Date();
 
+// 2. دالة تغيير ملف العروض (القلب النابض للنظام الجديد)
+async function changeOfferFile(fileName) {
+    const loader = document.getElementById('loadingIndicator');
+    if(loader) loader.style.display = 'flex'; // إظهار التحميل
+
+    try {
+        console.log(`🔄 جاري تحميل: ${fileName}`);
+        
+        // تفريغ البيانات القديمة
+        offersDB = [];
+        if(typeof offersMap !== 'undefined') offersMap.clear();
+
+        // جلب ملف العروض المختار
+        const response = await fetch(fileName);
+        if (!response.ok) throw new Error(`لم يتم العثور على الملف: ${fileName}`);
+        
+        const data = await response.json();
+
+        // -- معالجة البيانات والتواريخ --
+        if (data.config) {
+            // تحديث التواريخ من داخل الملف (زي ما انت عايز)
+            CURRENT_OFFER_START = new Date(data.config.startDate);
+            CURRENT_OFFER_END = new Date(data.config.endDate);
+            if(data.config.nextStartDate) NEXT_OFFER_START = new Date(data.config.nextStartDate);
+            if(data.config.nextEndDate) NEXT_OFFER_END = new Date(data.config.nextEndDate);
+            
+            // تحديث العداد والتواريخ في الشاشة فوراً
+            if(typeof updateCountdown === 'function') updateCountdown();
+            if(typeof updateDatesInHTML === 'function') updateDatesInHTML();
+        }
+
+        // تخزين العروض
+        offersDB = data.offers ? data.offers : (Array.isArray(data) ? data : []);
+
+        console.log(`✅ تم تفعيل العروض: ${offersDB.length} عرض`);
+
+        // 🔥 خطوات التحديث الضرورية
+        if(typeof initOffersMap === 'function') initOffersMap(); // ربط العروض
+        if(typeof initializeFilters === 'function') initializeFilters(); // تحديث القوائم
+        if(typeof applyFilters === 'function') applyFilters(); // عرض المنتجات
+
+    } catch (error) {
+        console.error("❌ خطأ:", error);
+        alert(`⚠️ خطأ في تحميل ملف العروض: ${fileName}\nتأكد أن الملف موجود ومكتوب صح.`);
+    } finally {
+        if(loader) loader.style.display = 'none'; // إخفاء التحميل
+    }
+}
+
+// 3. دالة التشغيل الرئيسية (أول ما الموقع يفتح)
+async function initApp() {
+    try {
+        // أ) تحميل المنتجات (productsdb.json)
+        const prodRes = await fetch('productsdb.json');
+        if (!prodRes.ok) throw new Error("productsdb.json مش موجود!");
+        productsDB = await prodRes.json();
+        console.log(`📦 تم تحميل المنتجات: ${productsDB.length}`);
+
+        // ب) تحميل أول ملف عروض مختار في القائمة
+        const selectBox = document.getElementById('offerSourceSelect');
+        if(selectBox) {
+            await changeOfferFile(selectBox.value);
+        }
+
+    } catch (error) {
+        console.error("❌ فشل تشغيل التطبيق:", error);
+    }
+}
+
+// تشغيل التطبيق
+document.addEventListener('DOMContentLoaded', initApp);
 
 // ====== 🖼️ WORKER API INTEGRATION ======
 const WORKER_BASE = "https://dry-rain-899d.meralmohamed121022.workers.dev";
