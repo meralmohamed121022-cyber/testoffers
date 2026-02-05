@@ -1,63 +1,11 @@
-// 1. تعريف متغير العروض (فارغ مبدئياً)
-let offersDB = [];
-
-// 2. دالة تحميل ملف العروض
-async function loadOffersFile(fileName) {
-    const loader = document.getElementById('loadingIndicator');
-    if(loader) loader.style.display = 'block'; // أظهر علامة التحميل
-
-    try {
-        console.log(`📥 جاري تحميل الملف: ${fileName}`);
-        
-        // جلب البيانات من الملف الخارجي
-        const response = await fetch(fileName);
-        
-        if (!response.ok) {
-            throw new Error(`خطأ في تحميل الملف (${response.status})`);
-        }
-
-        // تحويل البيانات وحفظها في المتغير
-        offersDB = await response.json();
-        console.log(`✅ تم تحميل ${offersDB.length} عرض بنجاح`);
-
-        // 3. إعادة تهيئة الموقع بالداتا الجديدة
-        // أ) إعادة ربط المنتجات بالعروض
-        if (typeof offersMap !== 'undefined') {
-            offersMap.clear(); 
-            initOffersMap(); 
-        }
-
-        // ب) تحديث الفلاتر والقوائم المنسدلة
-        if (typeof updateDynamicFilters === 'function') updateDynamicFilters();
-        if (typeof buildCategoryNavigation === 'function') buildCategoryNavigation();
-
-        // ج) تحديث واجهة العرض
-        if (typeof applyFilters === 'function') {
-            applyFilters(); 
-        } else {
-            renderProducts();
-        }
-
-    } catch (error) {
-        console.error("❌ خطأ:", error);
-        alert(`عذراً، لم نتمكن من قراءة ملف العروض.\nتأكد أنك تستخدم Live Server أو رفعت الملفات على استضافة.\nالخطأ: ${error.message}`);
-    } finally {
-        if(loader) loader.style.display = 'none'; // إخفاء علامة التحميل
-    }
-}
-
-// 4. تشغيل تلقائي عند فتح الموقع (لتحميل الملف الافتراضي)
-document.addEventListener('DOMContentLoaded', () => {
-    // شغل أي دوال تانية محتاجها في البداية
-    if(typeof initFuzzySearch === 'function') initFuzzySearch();
-    
-    // حمل الملف المختار في القائمة
-    const selector = document.getElementById('offerFileSelect');
-    if(selector) {
-        loadOffersFile(selector.value);
-    }
-});
-[
+{
+  "config": {
+    "startDate": "2026-02-08T00:00:00",
+    "endDate": "2026-02-14T23:59:59",
+    "nextStartDate": "2026-02-15T00:00:00",
+    "nextEndDate": "2026-02-21T23:59:59"
+  },
+  "offers": [
     
   {
     "offerType": "Buy 1 @ SAR 49.95",
